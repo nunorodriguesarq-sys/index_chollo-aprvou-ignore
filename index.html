@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chollo Panel · Aprovação de Deals</title>
+  <style>
+    :root{
+      --bg:#f4f6f8;--card:#fff;--text:#18202a;--muted:#667085;--line:#e4e7ec;
+      --accent:#ff9900;--ok:#039855;--bad:#d92d20;--blue:#175cd3;--dark:#101828;
+      --shadow:0 8px 24px rgba(16,24,40,.08)
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    header{position:sticky;top:0;z-index:5;background:var(--dark);color:#fff;padding:14px 18px;display:flex;gap:12px;align-items:center;justify-content:space-between;box-shadow:var(--shadow)}
+    header h1{font-size:18px;margin:0}
+    header .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    input,select,textarea,button{font:inherit}
+    input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
+    button{border:0;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .btn{background:var(--dark);color:#fff}.btn2{background:var(--accent);color:#111}.btnOk{background:var(--ok);color:#fff}.btnBad{background:var(--bad);color:#fff}.btnGhost{background:#eef2f6;color:#101828}.btnBlue{background:var(--blue);color:#fff}
+    main{padding:18px;max-width:1380px;margin:auto}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+    .card[data-status="approved"]{opacity:.75;border-color:#9ae6b4}.card[data-status="ignored"]{opacity:.55;border-color:#fda29b}
+    .cardTop{display:flex;gap:12px;padding:14px;border-bottom:1px solid var(--line);position:relative}
+    .imgBox{width:110px;height:110px;border-radius:14px;background:#f2f4f7;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;border:1px solid var(--line)}
+    .imgBox img{width:100%;height:100%;object-fit:contain}
+    .info{min-width:0;flex:1;padding-right:165px}.title{font-weight:800;font-size:14px;line-height:1.25;margin:0 0 8px}.meta{font-size:12px;color:var(--muted);line-height:1.45}.price{font-size:22px;font-weight:900;color:#101828;margin:7px 0}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:800;background:#eef2ff;color:#3538cd;margin:2px 4px 2px 0}.pill.green{background:#ecfdf3;color:#027a48}.pill.red{background:#fef3f2;color:#b42318}.pill.orange{background:#fff6e5;color:#b54708}.pill.gray{background:#f2f4f7;color:#344054}
+    .modelSelect{position:absolute;right:12px;top:12px;max-width:155px;font-size:12px;padding:6px 8px;border-color:#fdb022;background:#fff7e8;font-weight:800}
+    .body{padding:14px;display:grid;gap:10px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.field label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin:0 0 4px}.field input,.field select{width:100%;font-size:13px}.checks{display:flex;gap:10px;flex-wrap:wrap;font-size:12px}.checks label{display:flex;gap:5px;align-items:center;background:#f9fafb;border:1px solid var(--line);border-radius:999px;padding:6px 8px}
+    textarea.preview{width:100%;min-height:200px;resize:vertical;border:1px solid var(--line);border-radius:14px;padding:12px;background:#fcfcfd;line-height:1.35;font-family:Arial,sans-serif;font-size:14px;white-space:pre-wrap}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1;min-width:90px}.small{font-size:11px;color:var(--muted)}
+    .hidden{display:none!important}.status{font-size:12px;color:var(--muted);padding:8px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.empty{padding:60px;text-align:center;color:var(--muted)}
+    .topStats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.stat{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;color:#344054}
+    @media(max-width:720px){.grid{grid-template-columns:1fr}.row,.row3{grid-template-columns:1fr}.info{padding-right:0}.modelSelect{position:static;margin:0 0 8px;width:100%;max-width:100%}.cardTop{flex-direction:column}.imgBox{width:100%;height:170px}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Chollo Panel · Aprovação de Deals</h1>
+    <div class="tools">
+      <input id="search" placeholder="Pesquisar título/ASIN/categoria" />
+      <select id="filterStatus">
+        <option value="pending">Pendentes</option>
+        <option value="all">Todos</option>
+        <option value="approved">Aprovados</option>
+        <option value="ignored">Ignorados</option>
+      </select>
+      <select id="filterModel">
+        <option value="">Todos os modelos</option>
+        <option value="flash_prime">Flash sale / Excl. Prime</option>
+        <option value="cupao_desconto">Cupão / Aplicar desconto</option>
+        <option value="subscreva_poupe">Subscreva e Poupe</option>
+        <option value="multi_unidades">2 ou mais un.</option>
+      </select>
+      <button class="btn2" id="reload">Atualizar</button>
+      <button class="btnGhost" id="exportState">Exportar</button>
+      <button class="btnBad" id="clearDone">Limpar aprov./ignor.</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="topStats" id="stats"></div>
+    <div class="status" id="status">A carregar...</div>
+    <div class="grid" id="cards"></div>
+    <div class="empty hidden" id="empty">Sem deals para mostrar.</div>
+  </main>
+
+<script>
+const DATA_URL = './deals-pendentes.json';
+const APPROVE_URL = '/webhook/deal-approve';
+const IGNORE_URL = '/webhook/deal-ignore';
+const STORAGE_KEY = 'pg_chollo_panel_deals_v1';
+const LAST_SYNC_KEY = 'pg_chollo_panel_last_sync_v1';
+
+const MODELS = {
+  flash_prime: 'Flash sale / Excl. Prime',
+  cupao_desconto: 'Cupão / Aplicar desconto',
+  subscreva_poupe: 'Subscreva e Poupe',
+  multi_unidades: '2 ou mais un.'
+};
+
+const COUPON_OPTIONS = [
+  'cupão:',
+  'aplicar desconto',
+  'aplicar desconto + cupão:',
+  'aplicar desconto + desconto no checkout',
+  'desconto no checkout',
+  '𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲 + cupão:'
+];
+
+const SNS_OPTIONS = [
+  '𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲',
+  'aplicar desconto + 𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲',
+  '𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲 + desconto no checkout',
+  'aplicar desconto + 𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲 + desconto no checkout',
+  '𝗳𝗹𝗮𝘀𝗵 𝘀𝗮𝗹𝗲',
+  'desconto no checkout',
+  'aplicar desconto'
+];
+
+const MULTI_MORE_OPTIONS = [
+  '𝗠𝗔𝗜𝗦 𝗣𝗥𝗢𝗗𝗨𝗧𝗢𝗦 COMPRE com 𝟮 e PAGUE 𝟭:',
+  '𝗠𝗔𝗜𝗦 𝗣𝗥𝗢𝗗𝗨𝗧𝗢𝗦 COMPRE 𝟯 e PAGUE 𝟮:',
+  '𝗠𝗔𝗜𝗦 𝗣𝗥𝗢𝗗𝗨𝗧𝗢𝗦 2 UNIDADES com 𝟱𝟬% 𝗲𝗺 𝟭:',
+  '𝗠𝗔𝗜𝗦 𝗣𝗥𝗢𝗗𝗨𝗧𝗢𝗦 2 UNIDADES com 𝟳𝟬% 𝗲𝗺 𝟭:'
+];
+
+let deals = [];
+
+function safe(v, fallback='') { return v === null || v === undefined ? fallback : String(v); }
+function money(v){
+  if (v === null || v === undefined || v === '') return '';
+  const s = String(v).trim();
+  return s.includes('€') ? s : `${s}€`;
+}
+function hashtag(s){ return safe(s).trim().replace(/[,]/g,'').replace(/[\s-]+/g,'_'); }
+function guessModel(p){
+  if (p.modelo && MODELS[p.modelo]) return p.modelo;
+  if (p.multiQuantity || p.quantityDeal || p.multiBuy) return 'multi_unidades';
+  if (p.subscribeAndSave || p.subscribeAndSavePrice) return 'subscreva_poupe';
+  if (p.hasCoupon || p.couponText || p.couponAmountText || p.cupaoChollom) return 'cupao_desconto';
+  return 'flash_prime';
+}
+function catFinal(p){ return p.categoriaFinal || p.categoriaDetectada || p.approvedCategory || p.category || ''; }
+function subFinal(p){ return p.subcategoriaFinal || p.subcategoriaDetectada || p.approvedSubcategory || p.subcategory || ''; }
+function linkFinal(p){ return p.shortUrl || p.comboUrl || p.amazonUrl || ''; }
+function titleFinal(p){ return p.amazonTitle || p.title || ''; }
+function dealKey(p){ return safe(p.asin) || safe(p.dealUrl) || safe(p.amazonUrl) || `${safe(p.title)}_${safe(p.currentPrice)}`; }
+function nowIso(){ return new Date().toISOString(); }
+
+function optionHtml(list, selected=''){
+  return list.map(x => `<option value="${escapeHtml(x)}" ${x===selected?'selected':''}>${escapeHtml(x)}</option>`).join('');
+}
+function escapeHtml(str){ return safe(str).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+function buildPublication(p){
+  const model = p.modelo;
+  const prefix = [
+    '#pub_amazon 🇪🇸',
+    p.minHistorico ? ' ❗𝗠𝗜𝗡𝗜𝗠𝗢 𝗛𝗜𝗦𝗧𝗢𝗥𝗜𝗖𝗢❗' : '',
+    p.bomPreco ? ' 🔥𝗕𝗼𝗺 𝗣𝗿𝗲ç𝗼!' : '',
+    p.extraTop ? ` ${p.extraTop}` : '',
+    p.rapido ? ' 🏃🏃🏃' : ''
+  ].join('');
+  const title = p.editTitle || titleFinal(p);
+  const link = p.editLink || linkFinal(p);
+  const price = money(p.editPrice || p.currentPrice || p.currentPriceValue);
+  const pvp = p.editPvp || p.pvp || '';
+  const category = hashtag(p.editCategory || catFinal(p));
+  const subcategory = hashtag(p.editSubcategory || subFinal(p));
+  const tags = `#publi 🔎 #${category || '⚠️Erro_categoria_1'} #${subcategory || '⚠️Erro_categoria_2'}`;
+
+  let line = '';
+
+  if (model === 'flash_prime') {
+    const badge = p.primeExclusive ? '𝙚𝙭𝙘𝙡𝙪𝙨𝙞𝙫𝙤 𝙥𝙧𝙞𝙢𝙚' : '𝗳𝗹𝗮𝘀𝗵 𝘀𝗮𝗹𝗲';
+    line = `💥 ${price} ${badge} ${pvp ? `(pvp ${money(pvp)})` : '(pvp ⚠️ERRO)'}`;
+  }
+
+  if (model === 'cupao_desconto') {
+    const primePrefix = p.primeExclusive ? '𝙚𝙭𝙘𝙡𝙪𝙨𝙞𝙫𝙤 𝙥𝙧𝙞𝙢𝙚 + ' : '';
+    const opt = p.discountOption || 'cupão:';
+    const code = needsCode(opt) ? ` ${p.couponCode || p.cupaoChollom || ''}` : '';
+    line = `💥 ${price} ${primePrefix}${opt}${code} ${pvp ? `(pvp ${money(pvp)})` : '(pvp ⚠️ERRO)'}`;
+  }
+
+  if (model === 'subscreva_poupe') {
+    const opt = p.snsOption || '𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲';
+    const primePrefix = p.primeExclusive ? '𝙚𝙭𝙘𝙡𝙪𝙨𝙞𝙫𝙤 𝙥𝙧𝙞𝙢𝙚 + ' : '';
+    line = `💥 ${price} ${primePrefix}${opt} ${pvp ? `(pvp ${money(pvp)})` : '(pvp ⚠️ERRO)'}`;
+    if (opt.includes('𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮')) line += `\n𝑠𝑢𝑏𝑠𝑐𝑟𝑖𝑐̧𝑎̃𝑜 𝑐𝑎𝑛𝑐𝑒𝑙𝑎́𝑣𝑒𝑙 𝑎 𝑞𝑢𝑎𝑙𝑞𝑢𝑒𝑟 𝑎𝑙𝑡𝑢𝑟𝑎, 𝑠𝑒𝑚 𝑒𝑛𝑐𝑎𝑟𝑔𝑜𝑠`;
+  }
+
+  if (model === 'multi_unidades') {
+    const qty = p.multiQty || '2';
+    const unit = p.multiUnit || 'un';
+    const opt = p.multiOption || 'desconto no checkout';
+    line = `${qty} ${unit} 💥 ${price} ${opt} ${pvp ? `(pvp ${money(pvp)})` : '(pvp ⚠️ERRO)'}`;
+    if (opt.includes('𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮')) line += `\n𝑠𝑢𝑏𝑠𝑐𝑟𝑖𝑐̧𝑎̃𝑜 𝑐𝑎𝑛𝑐𝑒𝑙𝑎́𝑣𝑒𝑙 𝑎 𝑞𝑢𝑎𝑙𝑞𝑢𝑒𝑟 𝑎𝑙𝑡𝑢𝑟𝑎, 𝑠𝑒𝑚 𝑒𝑛𝑐𝑎𝑟𝑔𝑜𝑠`;
+    if (p.multiMore) line += `\n${p.multiMoreOption || MULTI_MORE_OPTIONS[0]} ${p.multiMoreLink || ''}`;
+  }
+
+  return `${prefix}\n${title}\n👉 ${link}\n${line}\n\n${tags}`.replace(/ +\n/g,'\n').trim();
+}
+
+function needsCode(opt){
+  return !['aplicar desconto','desconto no checkout','aplicar desconto + desconto no checkout'].includes(opt);
+}
+
+function normalizeDeal(raw){
+  const p = {...raw};
+  p.id = p.id || p.dealId || dealKey(p);
+  p.status = p.status || 'pending';
+  p.modelo = guessModel(p);
+  p.editTitle = p.editTitle ?? titleFinal(p);
+  p.editLink = p.editLink ?? linkFinal(p);
+  p.editPrice = p.editPrice ?? (p.subscribeAndSavePrice || p.currentPrice || (p.currentPriceValue ? String(p.currentPriceValue).replace('.', ',') + '€' : ''));
+  p.editPvp = p.editPvp ?? (p.pvp || '');
+  p.editCategory = p.editCategory ?? catFinal(p);
+  p.editSubcategory = p.editSubcategory ?? subFinal(p);
+  p.discountOption = p.discountOption || (p.hasCoupon ? 'cupão:' : 'aplicar desconto');
+  p.couponCode = p.couponCode || p.cupaoChollom || extractCoupon(p.couponText || p.couponAmountText || '');
+  p.snsOption = p.snsOption || (p.subscribeAndSave ? '𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲' : '𝗳𝗹𝗮𝘀𝗵 𝘀𝗮𝗹𝗲');
+  p.multiQty = p.multiQty || '2'; p.multiUnit = p.multiUnit || 'un'; p.multiOption = p.multiOption || 'desconto no checkout';
+  p.multiMore = Boolean(p.multiMore); p.multiMoreOption = p.multiMoreOption || MULTI_MORE_OPTIONS[0]; p.multiMoreLink = p.multiMoreLink || '';
+  p.minHistorico = Boolean(p.minHistorico || p.estaNoMinHistorico);
+  p.bomPreco = Boolean(p.bomPreco); p.rapido = Boolean(p.rapido); p.extraTop = p.extraTop || '';
+  p.createdAt = p.createdAt || nowIso();
+  p.updatedAt = p.updatedAt || nowIso();
+  p.textoPublicacao = p.textoPublicacao || buildPublication(p);
+  return p;
+}
+function extractCoupon(text){
+  const m = safe(text).match(/[A-Z0-9]{4,}/i); return m ? m[0] : '';
+}
+
+function loadLocal(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').map(normalizeDeal); }
+  catch { return []; }
+}
+function saveLocal(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(deals));
+  localStorage.setItem(LAST_SYNC_KEY, nowIso());
+  updateStats();
+}
+function mergeIncoming(incomingRaw){
+  const incoming = incomingRaw.map(normalizeDeal);
+  const byId = new Map(deals.map(d => [dealKey(d), d]));
+  let added = 0;
+  let updated = 0;
+
+  for (const nd of incoming) {
+    const key = dealKey(nd);
+    const existing = byId.get(key);
+    if (!existing) {
+      deals.unshift(nd);
+      byId.set(key, nd);
+      added++;
+      continue;
+    }
+
+    // Mantém edições/status locais, mas atualiza campos técnicos vindos do workflow.
+    const keep = {
+      status: existing.status,
+      modelo: existing.modelo,
+      editTitle: existing.editTitle,
+      editLink: existing.editLink,
+      editPrice: existing.editPrice,
+      editPvp: existing.editPvp,
+      editCategory: existing.editCategory,
+      editSubcategory: existing.editSubcategory,
+      discountOption: existing.discountOption,
+      couponCode: existing.couponCode,
+      snsOption: existing.snsOption,
+      multiQty: existing.multiQty,
+      multiUnit: existing.multiUnit,
+      multiOption: existing.multiOption,
+      multiMore: existing.multiMore,
+      multiMoreOption: existing.multiMoreOption,
+      multiMoreLink: existing.multiMoreLink,
+      minHistorico: existing.minHistorico,
+      bomPreco: existing.bomPreco,
+      rapido: existing.rapido,
+      extraTop: existing.extraTop,
+      textoPublicacao: existing.textoPublicacao,
+      createdAt: existing.createdAt,
+      approvedAt: existing.approvedAt,
+      ignoredAt: existing.ignoredAt
+    };
+    Object.assign(existing, nd, keep, { updatedAt: nowIso() });
+    updated++;
+  }
+
+  saveLocal();
+  return { added, updated, incoming: incoming.length };
+}
+
+async function loadDeals(){
+  const status = document.getElementById('status');
+  status.textContent = 'A carregar deals...';
+  deals = loadLocal();
+  render();
+
+  try{
+    const r = await fetch(DATA_URL + '?t=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const incomingRaw = Array.isArray(data) ? data : (data.items || data.deals || []);
+    const res = mergeIncoming(incomingRaw);
+    status.textContent = `${deals.length} deals acumuladas · novas: ${res.added} · atualizadas: ${res.updated}`;
+    render();
+  }catch(e){
+    status.textContent = deals.length
+      ? `A usar acumulado local (${deals.length}). Não consegui ler deals-pendentes.json: ${e.message}`
+      : 'Erro ao carregar deals-pendentes.json: ' + e.message;
+  }
+}
+
+function render(){
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const fm = document.getElementById('filterModel').value;
+  const fs = document.getElementById('filterStatus').value;
+  const list = deals.filter(p => {
+    const text = [p.title,p.amazonTitle,p.asin,p.editCategory,p.editSubcategory,p.currentPrice,p.pvp].join(' ').toLowerCase();
+    const statusOk = fs === 'all' || p.status === fs;
+    return statusOk && (!q || text.includes(q)) && (!fm || p.modelo === fm);
+  });
+  document.getElementById('empty').classList.toggle('hidden', list.length > 0);
+  document.getElementById('cards').innerHTML = list.map(cardHtml).join('');
+  list.forEach(bindCard);
+  updateStats();
+}
+
+function updateStats(){
+  const total = deals.length;
+  const pending = deals.filter(d => d.status === 'pending').length;
+  const approved = deals.filter(d => d.status === 'approved').length;
+  const ignored = deals.filter(d => d.status === 'ignored').length;
+  const last = localStorage.getItem(LAST_SYNC_KEY) || '';
+  document.getElementById('stats').innerHTML = `
+    <span class="stat">Total: ${total}</span>
+    <span class="stat">Pendentes: ${pending}</span>
+    <span class="stat">Aprovadas: ${approved}</span>
+    <span class="stat">Ignoradas: ${ignored}</span>
+    ${last ? `<span class="stat">Última atualização: ${new Date(last).toLocaleString('pt-PT')}</span>` : ''}
+  `;
+}
+
+function cardHtml(p){
+  return `<article class="card" data-id="${escapeHtml(dealKey(p))}" data-status="${escapeHtml(p.status)}">
+    <div class="cardTop">
+      <div class="imgBox"><img src="${escapeHtml(p.amazonImage || p.image || '')}" loading="lazy" /></div>
+      <div class="info">
+        <select class="modelSelect" data-field="modelo">${Object.entries(MODELS).map(([k,v])=>`<option value="${k}" ${p.modelo===k?'selected':''}>${v}</option>`).join('')}</select>
+        <p class="title">${escapeHtml(titleFinal(p))}</p>
+        <div class="price">${escapeHtml(p.currentPrice || '')}</div>
+        <div class="meta">ASIN: <b>${escapeHtml(p.asin)}</b><br>${escapeHtml(p.editCategory)} › ${escapeHtml(p.editSubcategory)}</div>
+        <div>
+          ${p.pvp ? `<span class="pill">PVP ${escapeHtml(p.pvp)}</span>`:''}
+          ${p.hasCoupon ? `<span class="pill orange">Cupão</span>`:''}
+          ${p.subscribeAndSave ? `<span class="pill green">S&S</span>`:''}
+          ${p.primeExclusive ? `<span class="pill red">Prime exclusivo</span>`:''}
+          ${p.status !== 'pending' ? `<span class="pill gray">${escapeHtml(p.status)}</span>`:''}
+          ${p.categoriaSource ? `<span class="pill">${escapeHtml(p.categoriaSource)}</span>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="body">
+      <div class="checks">
+        <label><input type="checkbox" data-field="minHistorico" ${p.minHistorico?'checked':''}> ❗Mínimo histórico</label>
+        <label><input type="checkbox" data-field="bomPreco" ${p.bomPreco?'checked':''}> 🔥 Bom preço</label>
+        <label><input type="checkbox" data-field="rapido" ${p.rapido?'checked':''}> 🏃🏃🏃</label>
+        <label><input type="checkbox" data-field="primeExclusive" ${p.primeExclusive?'checked':''}> Prime</label>
+      </div>
+      <div class="row">
+        <div class="field"><label>Título</label><input data-field="editTitle" value="${escapeHtml(p.editTitle)}"></div>
+        <div class="field"><label>Link</label><input data-field="editLink" value="${escapeHtml(p.editLink)}"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Preço</label><input data-field="editPrice" value="${escapeHtml(p.editPrice)}"></div>
+        <div class="field"><label>PVP</label><input data-field="editPvp" value="${escapeHtml(p.editPvp)}"></div>
+        <div class="field"><label>Extra topo</label><input data-field="extraTop" placeholder="texto opcional" value="${escapeHtml(p.extraTop)}"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Categoria</label><input data-field="editCategory" value="${escapeHtml(p.editCategory)}"></div>
+        <div class="field"><label>Subcategoria</label><input data-field="editSubcategory" value="${escapeHtml(p.editSubcategory)}"></div>
+      </div>
+      <div class="dynamic">${dynamicOptionsHtml(p)}</div>
+      <textarea class="preview" data-field="textoPublicacao">${escapeHtml(p.textoPublicacao)}</textarea>
+      <div class="actions">
+        <button class="btnGhost copy">Copiar</button>
+        <button class="btnOk approve">Aprovar</button>
+        <button class="btnBad ignore">Ignorar</button>
+        ${p.status !== 'pending' ? '<button class="btnBlue pending">Repor pendente</button>' : ''}
+        <button class="btnGhost openAmazon">Amazon</button>
+        <button class="btnGhost openDeal">Chollo</button>
+        <button class="btnGhost removeLocal">Remover</button>
+      </div>
+      <div class="small">Confiança: ${escapeHtml(p.categoriaConfidence || '')} · Score: ${escapeHtml(p.categoriaScore || '')} · Criado: ${new Date(p.createdAt).toLocaleString('pt-PT')}</div>
+    </div>
+  </article>`;
+}
+
+function dynamicOptionsHtml(p){
+  if (p.modelo === 'cupao_desconto') return `<div class="row"><div class="field"><label>Tipo desconto</label><select data-field="discountOption">${optionHtml(COUPON_OPTIONS,p.discountOption)}</select></div><div class="field"><label>Código cupão</label><input data-field="couponCode" value="${escapeHtml(p.couponCode)}"></div></div>`;
+  if (p.modelo === 'subscreva_poupe') return `<div class="field"><label>Opção S&S</label><select data-field="snsOption">${optionHtml(SNS_OPTIONS,p.snsOption)}</select></div>`;
+  if (p.modelo === 'multi_unidades') return `<div class="row3"><div class="field"><label>Quantidade</label><input data-field="multiQty" value="${escapeHtml(p.multiQty)}"></div><div class="field"><label>Unidade</label><select data-field="multiUnit"><option value="un" ${p.multiUnit==='un'?'selected':''}>un</option><option value="packs" ${p.multiUnit==='packs'?'selected':''}>packs</option></select></div><div class="field"><label>Opção</label><select data-field="multiOption">${optionHtml(['𝘀𝘂𝗯𝘀𝗰𝗿𝗲𝘃𝗮 𝗲 𝗽𝗼𝘂𝗽𝗲 + desconto no checkout','desconto no checkout'],p.multiOption)}</select></div></div><div class="checks"><label><input type="checkbox" data-field="multiMore" ${p.multiMore?'checked':''}> Mais produtos</label></div><div class="row"><div class="field"><label>Texto mais produtos</label><select data-field="multiMoreOption">${optionHtml(MULTI_MORE_OPTIONS,p.multiMoreOption)}</select></div><div class="field"><label>Link extra</label><input data-field="multiMoreLink" value="${escapeHtml(p.multiMoreLink)}"></div></div>`;
+  return `<div class="small">Modelo automático: mostra flash sale ou exclusivo prime conforme opção Prime.</div>`;
+}
+
+function findByKey(key){ return deals.find(d => dealKey(d) === key); }
+function bindCard(p){
+  const key = dealKey(p);
+  const el = document.querySelector(`.card[data-id="${CSS.escape(key)}"]`);
+  if (!el) return;
+  el.querySelectorAll('[data-field]').forEach(input => {
+    input.addEventListener('input', () => updateField(p, input));
+    input.addEventListener('change', () => updateField(p, input));
+  });
+  el.querySelector('.copy').onclick = async () => { await navigator.clipboard.writeText(p.textoPublicacao); alert('Copiado'); };
+  el.querySelector('.approve').onclick = () => postAction(APPROVE_URL, p, el, 'approved');
+  el.querySelector('.ignore').onclick = () => postAction(IGNORE_URL, p, el, 'ignored');
+  const pending = el.querySelector('.pending'); if (pending) pending.onclick = () => setStatusLocal(p, 'pending');
+  el.querySelector('.openAmazon').onclick = () => window.open(p.amazonUrl,'_blank');
+  el.querySelector('.openDeal').onclick = () => window.open(p.dealUrl,'_blank');
+  el.querySelector('.removeLocal').onclick = () => removeLocal(p);
+}
+
+function updateField(p, input){
+  const field = input.dataset.field;
+  if (!field) return;
+  p[field] = input.type === 'checkbox' ? input.checked : input.value;
+  p.updatedAt = nowIso();
+  if (field === 'modelo') {
+    p.textoPublicacao = buildPublication(p);
+    saveLocal();
+    render();
+    return;
+  }
+  if (field !== 'textoPublicacao') {
+    p.textoPublicacao = buildPublication(p);
+    const card = document.querySelector(`.card[data-id="${CSS.escape(dealKey(p))}"]`);
+    const ta = card?.querySelector('textarea.preview');
+    if (ta) ta.value = p.textoPublicacao;
+  } else {
+    p.textoPublicacao = input.value;
+  }
+  saveLocal();
+}
+
+function setStatusLocal(p, status){
+  p.status = status;
+  p.updatedAt = nowIso();
+  if (status === 'approved') p.approvedAt = nowIso();
+  if (status === 'ignored') p.ignoredAt = nowIso();
+  saveLocal();
+  render();
+}
+
+async function postAction(url, p, el, status){
+  const payload = {
+    ...p,
+    approvedText: p.textoPublicacao,
+    finalText: p.textoPublicacao,
+    finalModel: p.modelo,
+    finalCategory: p.editCategory,
+    finalSubcategory: p.editSubcategory,
+    finalPrice: p.editPrice,
+    finalPvp: p.editPvp,
+    action: status,
+    actionAt: nowIso()
+  };
+  try{
+    const r = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if (!r.ok) throw new Error(await r.text());
+    setStatusLocal(p, status);
+  }catch(e){ alert('Erro: ' + e.message); }
+}
+
+function removeLocal(p){
+  if (!confirm('Remover esta deal apenas deste painel?')) return;
+  const key = dealKey(p);
+  deals = deals.filter(d => dealKey(d) !== key);
+  saveLocal();
+  render();
+}
+
+function exportState(){
+  const blob = new Blob([JSON.stringify({exportedAt: nowIso(), deals}, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chollo-panel-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function clearDone(){
+  if (!confirm('Limpar do painel todas as deals aprovadas e ignoradas?')) return;
+  deals = deals.filter(d => d.status === 'pending');
+  saveLocal();
+  render();
+}
+
+document.getElementById('reload').onclick = loadDeals;
+document.getElementById('search').oninput = render;
+document.getElementById('filterModel').onchange = render;
+document.getElementById('filterStatus').onchange = render;
+document.getElementById('exportState').onclick = exportState;
+document.getElementById('clearDone').onclick = clearDone;
+loadDeals();
+</script>
+</body>
+</html>
