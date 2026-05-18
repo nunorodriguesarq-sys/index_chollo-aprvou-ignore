@@ -34,7 +34,25 @@
     .actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1;min-width:90px}.small{font-size:11px;color:var(--muted)}
     .hidden{display:none!important}.status{font-size:12px;color:var(--muted);padding:8px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.empty{padding:60px;text-align:center;color:var(--muted)}
     .topStats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.stat{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;color:#344054}
-    @media(max-width:720px){.grid{grid-template-columns:1fr}.row,.row3{grid-template-columns:1fr}.info{padding-right:0}.modelSelect{position:static;margin:0 0 8px;width:100%;max-width:100%}.cardTop{flex-direction:column}.imgBox{width:100%;height:170px}}
+    .catLine{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}
+    .catPill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:900;line-height:1.1;border:1px solid transparent}
+    .catPill.category{background:#e0f2fe;color:#075985;border-color:#7dd3fc}
+    .catPill.subcategory{background:#dcfce7;color:#166534;border-color:#86efac}
+    .catPill.missing{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+    .correctCategoryBtn{background:#f97316;color:#fff;border-radius:999px;padding:5px 9px;font-size:11px;box-shadow:0 2px 8px rgba(249,115,22,.25)}
+    .categoryModalOverlay{position:fixed;inset:0;z-index:50;background:rgba(16,24,40,.68);display:flex;align-items:center;justify-content:center;padding:18px}
+    .categoryModal{width:min(760px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;box-shadow:0 24px 80px rgba(16,24,40,.35);border:1px solid rgba(255,255,255,.25)}
+    .categoryModalHeader{position:sticky;top:0;background:#fff;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px;border-bottom:1px solid var(--line)}
+    .categoryModalHeader h2{margin:0;font-size:18px}.categoryModalHeader .small{margin-top:6px;line-height:1.45}
+    .categorySearch{width:calc(100% - 36px);margin:14px 18px 8px;border-color:#fdb022;background:#fffaf0;font-weight:700}
+    .categoryGroup{margin:10px 18px;padding:12px;border:1px solid var(--line);border-radius:16px;background:#fcfcfd}
+    .categoryGroup.current{border-color:#175cd3;background:#eff8ff;box-shadow:0 0 0 3px rgba(23,92,211,.08)}
+    .categoryName{font-size:13px;font-weight:900;color:#101828;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+    .subcatList{display:flex;gap:8px;flex-wrap:wrap}
+    .subcatBtn{background:#eef2f6;color:#101828;border:1px solid #d0d5dd;border-radius:999px;padding:7px 10px;font-size:12px}
+    .subcatBtn.current{background:#039855;color:#fff;border-color:#039855;box-shadow:0 2px 10px rgba(3,152,85,.22)}
+    .modalClose{background:#f2f4f7;color:#344054;border-radius:999px;width:34px;height:34px;padding:0;flex:0 0 auto}
+    @media(max-width:720px){.grid{grid-template-columns:1fr}.row,.row3{grid-template-columns:1fr}.info{padding-right:0}.modelSelect{position:static;margin:0 0 8px;width:100%;max-width:100%}.cardTop{flex-direction:column}.imgBox{width:100%;height:170px}.categoryModalOverlay{align-items:flex-end;padding:0}.categoryModal{max-height:92vh;border-radius:20px 20px 0 0}}
   </style>
 </head>
 <body>
@@ -67,11 +85,13 @@
     <div class="grid" id="cards"></div>
     <div class="empty hidden" id="empty">Sem deals para mostrar.</div>
   </main>
+  <div id="categoryModalRoot"></div>
 
 <script>
 const DATA_URL = './deals-pendentes.json';
 const APPROVE_URL = '/webhook/deal-approve';
 const IGNORE_URL = '/webhook/deal-ignore';
+const CATEGORIES_URL = '/categories/categorias.json';
 const STORAGE_KEY = 'pg_chollo_panel_deals_v1';
 const LAST_SYNC_KEY = 'pg_chollo_panel_last_sync_v1';
 
@@ -109,6 +129,8 @@ const MULTI_MORE_OPTIONS = [
 ];
 
 let deals = [];
+let categoriesData = [];
+let categoryLoadError = '';
 
 function safe(v, fallback='') { return v === null || v === undefined ? fallback : String(v); }
 function money(v){
@@ -217,6 +239,30 @@ function extractCoupon(text){
   const m = safe(text).match(/[A-Z0-9]{4,}/i); return m ? m[0] : '';
 }
 
+function normalizeCategoriesPayload(payload){
+  const source = Array.isArray(payload) ? payload : (Array.isArray(payload?.categories) ? payload.categories : []);
+  return source.map(item => {
+    const category = safe(item.category || item.categoria || item.name).trim();
+    const rawSubs = item.subcategories || item.subcategorias || item.children || [];
+    const subcategories = (Array.isArray(rawSubs) ? rawSubs : []).map(sub => safe(typeof sub === 'object' ? (sub.name || sub.category || sub.categoria) : sub).trim()).filter(Boolean);
+    return { category, subcategories };
+  }).filter(item => item.category && item.subcategories.length);
+}
+
+async function loadCategories(){
+  categoryLoadError = '';
+  try{
+    const r = await fetch(CATEGORIES_URL + '?t=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    categoriesData = normalizeCategoriesPayload(await r.json());
+    if (!categoriesData.length) throw new Error('ficheiro sem categorias válidas');
+  }catch(e){
+    categoriesData = [];
+    categoryLoadError = e.message;
+  }
+  return categoriesData;
+}
+
 function loadLocal(){
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').map(normalizeDeal); }
   catch { return []; }
@@ -252,6 +298,12 @@ function mergeIncoming(incomingRaw){
       editPvp: existing.editPvp,
       editCategory: existing.editCategory,
       editSubcategory: existing.editSubcategory,
+      categoriaFinal: existing.categoriaFinal,
+      subcategoriaFinal: existing.subcategoriaFinal,
+      categoriaDetectada: existing.categoriaDetectada,
+      subcategoriaDetectada: existing.subcategoriaDetectada,
+      categoriaSource: existing.categoriaSource,
+      manualCategoryCorrection: existing.manualCategoryCorrection,
       discountOption: existing.discountOption,
       couponCode: existing.couponCode,
       snsOption: existing.snsOption,
@@ -283,6 +335,8 @@ async function loadDeals(){
   status.textContent = 'A carregar deals...';
   deals = loadLocal();
   render();
+  const categoriesPromise = loadCategories();
+  let message = '';
 
   try{
     const r = await fetch(DATA_URL + '?t=' + Date.now(), {cache:'no-store'});
@@ -290,13 +344,16 @@ async function loadDeals(){
     const data = await r.json();
     const incomingRaw = Array.isArray(data) ? data : (data.items || data.deals || []);
     const res = mergeIncoming(incomingRaw);
-    status.textContent = `${deals.length} deals acumuladas · novas: ${res.added} · atualizadas: ${res.updated}`;
+    message = `${deals.length} deals acumuladas · novas: ${res.added} · atualizadas: ${res.updated}`;
     render();
   }catch(e){
-    status.textContent = deals.length
+    message = deals.length
       ? `A usar acumulado local (${deals.length}). Não consegui ler deals-pendentes.json: ${e.message}`
       : 'Erro ao carregar deals-pendentes.json: ' + e.message;
   }
+
+  await categoriesPromise;
+  status.textContent = categoryLoadError ? `${message} · Aviso: categorias não carregadas (${categoryLoadError})` : message;
 }
 
 function render(){
@@ -329,6 +386,16 @@ function updateStats(){
   `;
 }
 
+function categoryLineHtml(p){
+  const category = safe(p.editCategory || catFinal(p)).trim();
+  const subcategory = safe(p.editSubcategory || subFinal(p)).trim();
+  return `<div class="catLine">
+    <span class="catPill ${category ? 'category' : 'missing'}">${escapeHtml(category || 'Categoria em falta')}</span>
+    <span class="catPill ${subcategory ? 'subcategory' : 'missing'}">${escapeHtml(subcategory || 'Subcategoria em falta')}</span>
+    <button type="button" class="correctCategoryBtn">Corrigir</button>
+  </div>`;
+}
+
 function cardHtml(p){
   return `<article class="card" data-id="${escapeHtml(dealKey(p))}" data-status="${escapeHtml(p.status)}">
     <div class="cardTop">
@@ -337,7 +404,7 @@ function cardHtml(p){
         <select class="modelSelect" data-field="modelo">${Object.entries(MODELS).map(([k,v])=>`<option value="${k}" ${p.modelo===k?'selected':''}>${v}</option>`).join('')}</select>
         <p class="title">${escapeHtml(titleFinal(p))}</p>
         <div class="price">${escapeHtml(p.currentPrice || '')}</div>
-        <div class="meta">ASIN: <b>${escapeHtml(p.asin)}</b><br>${escapeHtml(p.editCategory)} › ${escapeHtml(p.editSubcategory)}</div>
+        <div class="meta">ASIN: <b>${escapeHtml(p.asin)}</b>${categoryLineHtml(p)}</div>
         <div>
           ${p.pvp ? `<span class="pill">PVP ${escapeHtml(p.pvp)}</span>`:''}
           ${p.hasCoupon ? `<span class="pill orange">Cupão</span>`:''}
@@ -391,6 +458,81 @@ function dynamicOptionsHtml(p){
   return `<div class="small">Modelo automático: mostra flash sale ou exclusivo prime conforme opção Prime.</div>`;
 }
 
+function openCategoryModal(p){
+  if (!categoriesData.length) {
+    alert('Categorias não carregadas. Confirma se existe /files/portugalgeek-data/categorias.json e se o nginx expõe /categories/categorias.json');
+    return;
+  }
+
+  const root = document.getElementById('categoryModalRoot');
+  const currentCategory = safe(p.editCategory || catFinal(p)).trim();
+  const currentSubcategory = safe(p.editSubcategory || subFinal(p)).trim();
+
+  const draw = (query='') => {
+    const needle = query.toLowerCase().trim();
+    const groups = categoriesData.filter(group => {
+      const hay = [group.category, ...(group.subcategories || [])].join(' ').toLowerCase();
+      return !needle || hay.includes(needle);
+    });
+
+    root.innerHTML = `<div class="categoryModalOverlay" role="dialog" aria-modal="true">
+      <div class="categoryModal">
+        <div class="categoryModalHeader">
+          <div>
+            <h2>Corrigir categoria</h2>
+            <div class="small"><b>${escapeHtml(titleFinal(p))}</b><br>ASIN: ${escapeHtml(p.asin || '—')}<br>Atual: ${escapeHtml(currentCategory || '—')} › ${escapeHtml(currentSubcategory || '—')}</div>
+          </div>
+          <button type="button" class="modalClose" aria-label="Fechar">×</button>
+        </div>
+        <input class="categorySearch" placeholder="Pesquisar categorias/subcategorias" value="${escapeHtml(query)}" autofocus>
+        <div class="categoryGroups">
+          ${groups.length ? groups.map(group => categoryGroupHtml(group, currentCategory, currentSubcategory)).join('') : '<div class="empty">Sem categorias encontradas.</div>'}
+        </div>
+      </div>
+    </div>`;
+
+    root.querySelector('.modalClose').onclick = closeCategoryModal;
+    root.querySelector('.categoryModalOverlay').onclick = e => { if (e.target.classList.contains('categoryModalOverlay')) closeCategoryModal(); };
+    root.querySelector('.categorySearch').oninput = e => draw(e.target.value);
+    root.querySelectorAll('.subcatBtn').forEach(btn => {
+      btn.onclick = () => applyCategoryCorrection(p, btn.dataset.category, btn.dataset.subcategory);
+    });
+    root.querySelector('.categorySearch').focus();
+  };
+
+  draw();
+}
+
+function categoryGroupHtml(group, currentCategory, currentSubcategory){
+  const isCurrentCategory = group.category === currentCategory;
+  return `<div class="categoryGroup ${isCurrentCategory ? 'current' : ''}">
+    <div class="categoryName">${escapeHtml(group.category)}${isCurrentCategory ? ' · atual' : ''}</div>
+    <div class="subcatList">
+      ${group.subcategories.map(sub => `<button type="button" class="subcatBtn ${isCurrentCategory && sub === currentSubcategory ? 'current' : ''}" data-category="${escapeHtml(group.category)}" data-subcategory="${escapeHtml(sub)}">${escapeHtml(sub)}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function applyCategoryCorrection(p, category, subcategory){
+  p.editCategory = category;
+  p.editSubcategory = subcategory;
+  p.categoriaFinal = category;
+  p.subcategoriaFinal = subcategory;
+  p.categoriaDetectada = category;
+  p.subcategoriaDetectada = subcategory;
+  p.categoriaSource = 'manual-panel';
+  p.manualCategoryCorrection = true;
+  p.updatedAt = nowIso();
+  p.textoPublicacao = buildPublication(p);
+  saveLocal();
+  closeCategoryModal();
+  render();
+}
+
+function closeCategoryModal(){
+  document.getElementById('categoryModalRoot').innerHTML = '';
+}
+
 function findByKey(key){ return deals.find(d => dealKey(d) === key); }
 function bindCard(p){
   const key = dealKey(p);
@@ -407,6 +549,7 @@ function bindCard(p){
   el.querySelector('.openAmazon').onclick = () => window.open(p.amazonUrl,'_blank');
   el.querySelector('.openDeal').onclick = () => window.open(p.dealUrl,'_blank');
   el.querySelector('.removeLocal').onclick = () => removeLocal(p);
+  el.querySelector('.correctCategoryBtn').onclick = () => openCategoryModal(p);
 }
 
 function updateField(p, input){
@@ -448,6 +591,10 @@ async function postAction(url, p, el, status){
     finalModel: p.modelo,
     finalCategory: p.editCategory,
     finalSubcategory: p.editSubcategory,
+    manualCategoryCorrection: Boolean(p.manualCategoryCorrection),
+    categoriaSource: p.categoriaSource || '',
+    editCategory: p.editCategory,
+    editSubcategory: p.editSubcategory,
     finalPrice: p.editPrice,
     finalPvp: p.editPvp,
     action: status,
